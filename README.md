@@ -17,9 +17,9 @@ with its siblings excluded, instead of its whole file.
 - [neotest](https://github.com/nvim-neotest/neotest).
 - `bashunit` on your `PATH`.
 
-The adapter was measured against bashunit 0.50.1. Every rule about bashunit's output shapes is recorded in
-`lua/neotest-bashunit/parse.lua` and pinned by frozen fixtures under `tests/`, with the release
-named in `M.verified_version`. A bashunit that changed an output shape would leave those fixtures
+The adapter was measured against bashunit 0.50.1. Every rule about bashunit's output shapes is
+recorded in `lua/neotest-bashunit/parse.lua` and pinned by frozen fixtures under `tests/`, with the
+release named in `M.verified_version`. A bashunit that changed an output shape would leave those fixtures
 green while the adapter misreported real runs, so `:checkhealth neotest-bashunit` warns when the
 installed release is not the one the fixtures came from.
 
