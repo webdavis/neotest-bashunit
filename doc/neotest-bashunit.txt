@@ -1,0 +1,166 @@
+*neotest-bashunit.txt*         A neotest adapter for bashunit test files
+
+Author:  Stephen A. Davis
+License: MIT
+
+==============================================================================
+CONTENTS                                            *neotest-bashunit-contents*
+
+  1. Introduction ................ |neotest-bashunit-introduction|
+  2. Requirements ................ |neotest-bashunit-requirements|
+  3. Installation ................ |neotest-bashunit-installation|
+  4. Test files .................. |neotest-bashunit-test-files|
+  5. Roots ....................... |neotest-bashunit-roots|
+  6. Running ..................... |neotest-bashunit-running|
+  7. Failures and lines .......... |neotest-bashunit-failures|
+  8. Ambiguous titles ............ |neotest-bashunit-ambiguous|
+  9. Health ...................... |neotest-bashunit-health|
+ 10. Tests ....................... |neotest-bashunit-tests|
+
+==============================================================================
+1. INTRODUCTION                                 *neotest-bashunit-introduction*
+
+neotest-bashunit runs bashunit test files through |neotest|.
+
+Bash test runners generally give you a whole file or nothing. This adapter
+provides the three things a generic shell runner cannot:
+
+  - output for ONE test, rather than the whole run it belonged to
+  - a jump to the line that actually failed
+  - running a single test instead of its whole file
+
+==============================================================================
+2. REQUIREMENTS                                 *neotest-bashunit-requirements*
+
+  - Neovim 0.10 or newer, which is where |vim.fs.root()| arrived. Developed
+    and tested on 0.12.5.
+  - neotest.
+  - `bashunit` on $PATH.
+
+Every rule this adapter holds about bashunit's output was measured against
+bashunit 0.50.1, named by `M.verified_version` in `lua/neotest-bashunit/
+parse.lua` and pinned by frozen fixtures under `tests/`. A bashunit release
+that changed an output shape would leave those fixtures green while the
+adapter misreported real runs, so |neotest-bashunit-health| warns when the
+installed release is not the one the fixtures came from.
+
+==============================================================================
+3. INSTALLATION                                 *neotest-bashunit-installation*
+
+With lazy.nvim, as a dependency of neotest: >lua
+
+    {
+      "nvim-neotest/neotest",
+      dependencies = {
+        "nvim-neotest/nvim-nio",
+        "webdavis/neotest-bashunit",
+      },
+      config = function()
+        require("neotest").setup({
+          adapters = {
+            require("neotest-bashunit"),
+          },
+        })
+      end,
+    }
+<
+The adapter is a plain table. There is no `setup` function and nothing to
+call: `require` it and put it in the adapter list.
+
+==============================================================================
+4. TEST FILES                                     *neotest-bashunit-test-files*
+
+A test file is one whose name ends in `.test.sh`.
+
+Inside it, a test is any function named `test_` followed by at least one more
+character, written with or without the `function` keyword, with or without
+whitespace inside the parentheses.
+
+That mirrors what bashunit RUNS, which is not the same as the grep bashunit
+uses for its own line lookups. The grep matches `testCamel` and `testable`,
+which bashunit never runs, and misses `test_eclair` spelled with a non-ASCII
+character, which bashunit runs and reports.
+
+==============================================================================
+5. ROOTS                                               *neotest-bashunit-roots*
+
+A directory belongs to this adapter when the nearest ancestor holding a
+`.bashunitrc` or a `.git` either:
+
+  - holds a `.bashunitrc`, an explicit opt-in taken at its word with or
+    without any test files present; or
+  - has at least one `*.test.sh` reachable inside it.
+
+The second half is load bearing. `.git` sits at the top of every repository
+there is, so claiming on the marker alone attaches this adapter to all of
+them. neotest hands a whole-directory run to the single adapter that claimed
+the directory, so a project with no bash in it would run its "all tests"
+through bashunit and find nothing to execute.
+
+The search prunes `.git`, `.bashunit`, `node_modules`, `target` and
+`fixtures`, and stops at the first match.
+
+==============================================================================
+6. RUNNING                                           *neotest-bashunit-running*
+
+One bashunit process per file.
+
+Running a single test passes `--filter` with that test's name, then names
+every sibling the filter would also drag in as an `--exclude-filter`.
+`--filter` is a SUBSTRING match rather than a regular expression, so
+`--filter test_alpha` on its own also runs `test_alpha_extended` and
+`test_beta_alpha`. Anchoring it matches nothing at all.
+
+Color is disabled through the `NO_COLOR` environment variable rather than
+`--no-color`, which is ignored in either position on 0.50.1.
+
+==============================================================================
+7. FAILURES AND LINES                               *neotest-bashunit-failures*
+
+bashunit's structured report carries no line number, so a failing test is
+mapped to a line by reading the assertion listing out of the run's own text
+output.
+
+When bashunit names exactly one assertion under `Source:`, the jump lands on
+it. When it lists several, which does not say which one failed, the jump goes
+to the test function's own line and the message says so, rather than pointing
+confidently at an assertion that passed.
+
+Each failing test also gets an output buffer holding only its own message, so
+the output window shows one test rather than the whole run.
+
+==============================================================================
+8. AMBIGUOUS TITLES                                *neotest-bashunit-ambiguous*
+
+bashunit titles a test by transforming its function name, and its report names
+tests by that title alone.
+
+`test_dupe` and `test_Dupe` both become "Dupe", so neither report row can be
+attributed to a function. Both positions are failed with the collision named,
+rather than one of them silently taking the other's verdict.
+
+A shared title across two DIFFERENT files is not ambiguous, because a report
+row names its file too.
+
+==============================================================================
+9. HEALTH                                             *neotest-bashunit-health*
+                                                     *:checkhealth-bashunit*
+>vim
+    :checkhealth neotest-bashunit
+<
+Reports whether bashunit is on $PATH, which release it is, and whether that
+release matches the one this adapter's fixtures were measured against.
+
+==============================================================================
+10. TESTS                                              *neotest-bashunit-tests*
+
+The rules live as pure functions over strings and tables, so they run under a
+bare headless Neovim with nothing installed: >sh
+
+    nvim --headless --clean -l tests/run.lua
+<
+Pass a spec name to narrow the run: >sh
+
+    nvim --headless --clean -l tests/run.lua root_spec
+<
+vim:tw=78:ts=8:noet:ft=help:norl:
