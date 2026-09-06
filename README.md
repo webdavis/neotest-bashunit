@@ -3,17 +3,13 @@
 A [neotest](https://github.com/nvim-neotest/neotest) adapter for
 [bashunit](https://github.com/TypedDevs/bashunit) test files.
 
-Bash test runners tend to give you the whole file or nothing. This adapter gives you the three
-things that are actually worth having:
-
-- **Output for one test.** The output window shows the test you asked about, not the run it
-  happened to be part of.
-- **A jump to the line that failed.** bashunit's structured report carries no line number, so the
-  adapter reads the assertion listing out of the run's own output. When bashunit names exactly one
-  assertion the jump lands on it; when it lists several, the jump goes to the test's own line and
-  the message says why, rather than pointing confidently at an assertion that passed.
-- **Running a single test.** One test by name, with its siblings excluded, instead of its whole
-  file.
+Most bash test runners give you the whole file or nothing. This adapter gives you the parts that are
+worth having. The output window shows the one test you asked about, not the run it happened to be part
+of. A failing test jumps to the line that failed: bashunit's structured report carries no line number,
+so the adapter reads the assertion listing out of the run's own output. When bashunit names exactly one
+assertion the jump lands on it. When it lists several, the jump goes to the test's own line and the
+message says why, rather than pointing at an assertion that passed. And you can run one test by name,
+with its siblings excluded, instead of its whole file.
 
 ## Requirements
 
@@ -21,7 +17,7 @@ things that are actually worth having:
 - [neotest](https://github.com/nvim-neotest/neotest).
 - `bashunit` on your `PATH`.
 
-Measured against **bashunit 0.50.1**. Every rule about bashunit's output shapes is recorded in
+The adapter was measured against bashunit 0.50.1. Every rule about bashunit's output shapes is recorded in
 `lua/neotest-bashunit/parse.lua` and pinned by frozen fixtures under `tests/`, with the release
 named in `M.verified_version`. A bashunit that changed an output shape would leave those fixtures
 green while the adapter misreported real runs, so `:checkhealth neotest-bashunit` warns when the
@@ -69,8 +65,8 @@ either:
   test files; or
 - has at least one `*.test.sh` reachable inside it.
 
-The second half matters more than it looks. `.git` sits at the top of every repository there is, so
-claiming on the marker alone attaches the adapter to all of them. neotest hands a whole-directory
+The second rule is there because `.git` sits at the top of every repository, so claiming on the
+marker alone would attach the adapter to all of them. neotest hands a whole-directory
 run to the single adapter that claimed the directory, so a project with no bash in it would run its
 "all tests" here and find nothing.
 
@@ -104,7 +100,8 @@ the adapter's fixtures were measured against.
 
 ## Tests
 
-Pure functions over strings and tables, run under a bare headless Neovim with nothing installed:
+The tests are pure functions over strings and tables. They run under a bare headless Neovim with
+nothing else installed:
 
 ```sh
 nvim --headless --clean -l tests/run.lua
