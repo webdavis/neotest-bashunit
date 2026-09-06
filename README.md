@@ -4,12 +4,14 @@ A [neotest](https://github.com/nvim-neotest/neotest) adapter for
 [bashunit](https://github.com/TypedDevs/bashunit) test files.
 
 Most bash test runners give you the whole file or nothing. This adapter gives you the parts that are
-worth having. The output window shows the one test you asked about, not the run it happened to be part
-of. A failing test jumps to the line that failed: bashunit's structured report carries no line number,
-so the adapter reads the assertion listing out of the run's own output. When bashunit names exactly one
-assertion the jump lands on it. When it lists several, the jump goes to the test's own line and the
-message says why, rather than pointing at an assertion that passed. And you can run one test by name,
-with its siblings excluded, instead of its whole file.
+worth having. A failing test's output window shows that one test's failure, not the whole run it was
+part of; bashunit reports no message for a test that passed, so a passing test still shows the run's
+output, because it has nothing of its own to show. A failing test also jumps to the line that failed.
+bashunit's structured report carries no line number, so the adapter reads the assertion listing out of
+the run's own output: when bashunit names exactly one assertion the jump lands on it, and when it lists
+several the jump goes to the test's own line and the message says why, rather than pointing at an
+assertion that passed. And you can run one test by name, with its siblings excluded, instead of its
+whole file.
 
 ## Requirements
 
@@ -50,7 +52,14 @@ it in the list.
 ## Which files it finds
 
 A test file is one whose name ends in `.test.sh`. Inside it, a test is any function named `test_`
-plus at least one more character, written with or without the `function` keyword.
+plus at least one more character, in any spelling bash accepts:
+
+```bash
+function test_x { ... }        # parentheses are optional after the keyword
+function test_x() { ... }
+function test_x ( ) { ... }    # and may be spaced
+test_x() { ... }               # without the keyword they are required
+```
 
 That rule mirrors what bashunit itself runs at runtime rather than the grep it uses for line
 lookups. The grep matches `testCamel` and `testable`, which bashunit never runs, and misses

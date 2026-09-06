@@ -73,8 +73,13 @@ call: `require` it and put it in the adapter list.
 A test file is one whose name ends in `.test.sh`.
 
 Inside it, a test is any function named `test_` followed by at least one more
-character, written with or without the `function` keyword, with or without
-whitespace inside the parentheses.
+character, in any spelling bash accepts: >bash
+
+    function test_x { ... }        # parentheses optional after the keyword
+    function test_x() { ... }
+    function test_x ( ) { ... }    # and may be spaced
+    test_x() { ... }               # without the keyword they are required
+<
 
 That mirrors what bashunit RUNS, which is not the same as the grep bashunit
 uses for its own line lookups. The grep matches `testCamel` and `testable`,

@@ -84,11 +84,22 @@ end
 -- titles "éclair". A position bashunit will not run can never go green, and one
 -- it runs but we never offered is a test neotest cannot see.
 --
--- The definition line itself is bash's, not bashunit's: `test_x ( )` is defined
--- by bash, enumerated by compgen and run (measured), so the parentheses may
--- hold and be surrounded by whitespace.
-local WITH_KEYWORD = "^%s*function%s+(test_[^%s()]+)%s*%(%s*%)"
-local BARE = "^%s*(test_[^%s()]+)%s*%(%s*%)"
+-- The definition line itself is bash's, not bashunit's, and bash spells it two
+-- ways (all four measured on 0.50.1: defined by bash, enumerated by compgen,
+-- run by bashunit):
+--
+--   function test_x { ... }     the parentheses are OPTIONAL after the keyword
+--   function test_x() { ... }
+--   function test_x ( ) { ... } and may be surrounded by whitespace
+--   test_x() { ... }            without the keyword they are REQUIRED
+--
+-- `function test_x{` and a bare `test_x {` are both syntax errors, so `{` is
+-- not a name character and a parenthesis-free definition needs the keyword.
+-- That is why the keyword form ends at a word boundary rather than simply
+-- dropping the parentheses: without it, the brace would be read as part of the
+-- name and offer a position bashunit can never run.
+local WITH_KEYWORD = "^%s*function%s+(test_[^%s(){]+)[%s(]"
+local BARE = "^%s*(test_[^%s(){]+)%s*%(%s*%)"
 
 ---Every test function in a file, in definition order, with its 1-based line.
 ---@param lines string[]
@@ -96,7 +107,9 @@ local BARE = "^%s*(test_[^%s()]+)%s*%(%s*%)"
 function M.test_functions(lines)
   local found = {}
   for number, line in ipairs(lines) do
-    local name = line:match(WITH_KEYWORD) or line:match(BARE)
+    -- One trailing space, so a definition that ends with the line meets the
+    -- same word boundary as one followed by whitespace or a parenthesis.
+    local name = (line .. " "):match(WITH_KEYWORD) or line:match(BARE)
     if name then
       found[#found + 1] = { name = name, line = number }
     end

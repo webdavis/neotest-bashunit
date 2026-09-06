@@ -141,6 +141,32 @@ return {
     assert(#found == 2, "expected both spaced definitions, got " .. #found)
   end,
 
+  ["test_functions takes the function keyword with no parentheses"] = function()
+    -- Bash makes the empty parentheses OPTIONAL after the `function` keyword
+    -- and REQUIRED without it. Measured on 0.50.1: all four spellings below are
+    -- defined by bash, enumerated by compgen and run by bashunit, and a
+    -- fixture holding the parenthesis-free one had it discovered by nobody.
+    local found = parse.test_functions({
+      "function test_no_parens {",
+      "function test_with_parens() {",
+      "function test_spaced ( ) {",
+      "test_bare_parens() {",
+    })
+    assert(#found == 4, "expected all four runnable spellings, got " .. #found)
+    assert(found[1].name == "test_no_parens", "got " .. tostring(found[1] and found[1].name))
+  end,
+
+  ["test_functions refuses the shapes bash will not parse"] = function()
+    -- The other side of that rule. `function name{` and a bare `name {` are
+    -- both syntax errors, so a name carrying a brace, and a parenthesis-free
+    -- definition without the keyword, are positions bashunit can never run.
+    local found = parse.test_functions({
+      "test_bare_no_parens {",
+      "function test_brace{ :; }",
+    })
+    assert(#found == 0, "expected nothing runnable, got " .. vim.inspect(found))
+  end,
+
   ["test_functions finds both spellings bashunit runs"] = function()
     local found = parse.test_functions(lines_of(table.concat({
       "#!/usr/bin/env bash",
