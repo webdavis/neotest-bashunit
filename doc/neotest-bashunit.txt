@@ -116,6 +116,16 @@ every sibling the filter would also drag in as an `--exclude-filter`.
 `--filter test_alpha` on its own also runs `test_alpha_extended` and
 `test_beta_alpha`. Anchoring it matches nothing at all.
 
+bashunit splits exclusions at commas. Selecting `test_a` beside `test_a,{b}`
+would exclude both, so the adapter refuses that individual run and asks you
+to run the whole file. Comma and colon names remain selectable when their
+filters isolate the test. Run the current file with: >lua
+
+    require("neotest").run.run(vim.fn.expand("%:p"))
+<
+File and directory runs need no exclusions. The bashunit limitation is tracked
+at https://github.com/TypedDevs/bashunit/issues/1340.
+
 Color is disabled through the `NO_COLOR` environment variable rather than
 `--no-color`, which is ignored in either position on 0.50.1.
 

@@ -89,6 +89,12 @@ then names every sibling the filter would also drag in as an `--exclude-filter`,
 is a substring match rather than a regular expression: `--filter test_alpha` on its own also runs
 `test_alpha_extended` and `test_beta_alpha`.
 
+bashunit [splits exclusions at commas](https://github.com/TypedDevs/bashunit/issues/1340). Selecting
+`test_a` beside `test_a,{b}` would exclude both,
+so the adapter refuses that individual run and asks you to run the whole file. Comma and colon names
+remain selectable when their filters isolate the test. To run the current file, use
+`require("neotest").run.run(vim.fn.expand("%:p"))`; file and directory runs need no exclusions.
+
 Color is disabled with `NO_COLOR`, not `--no-color`, which is ignored in either position on 0.50.1.
 
 ## Two tests with the same title
