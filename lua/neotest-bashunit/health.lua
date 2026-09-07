@@ -1,13 +1,7 @@
--- `:checkhealth neotest-bashunit`.
---
--- Answers the one question that decides whether this adapter can work at all:
--- is bashunit here, and is it the release every rule in `parse.lua` was
--- measured against. A release that changed an output shape would leave the
--- frozen fixtures green while the adapter quietly misreported real runs, so a
--- mismatch is worth saying out loud rather than discovering through a test that
--- never goes red.
+-- `:checkhealth neotest-bashunit` checks the measured version and build.
 
 local parse = require("neotest-bashunit.parse")
+local artifact = require("neotest-bashunit.artifact")
 
 local M = {}
 
@@ -36,13 +30,26 @@ function M.check()
     return
   end
 
-  if version == parse.verified_version then
-    vim.health.ok(("version %s, the release this adapter was measured against"):format(version))
+  if version == parse.verified_version and artifact.verified(executable) then
+    vim.health.ok(
+      ("version %s, verified beta %s (SHA-256 %s)"):format(
+        version,
+        artifact.verified_revision,
+        artifact.verified_sha256
+      )
+    )
   else
-    vim.health.warn(("version %s, but this adapter was measured against %s"):format(version, parse.verified_version), {
-      "Discovery and result parsing may disagree with what this bashunit prints.",
-      "Re-measure the fixtures in tests/ before moving M.verified_version in lua/neotest-bashunit/parse.lua.",
-    })
+    vim.health.warn(
+      ("version %s, but the measured beta requires version %s and SHA-256 %s"):format(
+        version,
+        parse.verified_version,
+        artifact.verified_sha256
+      ),
+      {
+        "Discovery and result parsing may disagree with what this bashunit prints.",
+        "Re-measure the fixtures before changing the version in parse.lua or the build identity in artifact.lua.",
+      }
+    )
   end
 end
 

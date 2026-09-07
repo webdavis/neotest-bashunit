@@ -15,13 +15,16 @@ jobs:
           persist-credentials: false
       - name: Install lint and test tools
         env:
-          BASHUNIT_VERSION: "0.50.1"
-          BASHUNIT_SHA256: "18d83d590c5304f1853dd4fe4fec4ec6effbd9fe5a21831fe9f66f70afe17d93"
+          BASHUNIT_COMMIT: "683ba16f54fee391dc30bea0a5e6201aeef72c19"
+          BASHUNIT_SHA256: "429a0f25cf39b2779e3266b4a5bb2c098cb5ebed60d9a3476a1fea3c5acc7a49"
         run: |
           set -euo pipefail
-          brew install bash luacheck neovim stylua
+          brew install bash jq luacheck neovim shfmt stylua
           mkdir -p "$RUNNER_TEMP/bin"
-          curl -fsSL --retry 3 -o "$RUNNER_TEMP/bin/bashunit" "https://github.com/TypedDevs/bashunit/releases/download/${BASHUNIT_VERSION}/bashunit"
+          git clone --quiet --no-checkout --filter=blob:none https://github.com/TypedDevs/bashunit.git "$RUNNER_TEMP/bashunit-source"
+          git -C "$RUNNER_TEMP/bashunit-source" checkout --quiet --detach "$BASHUNIT_COMMIT"
+          test "$(git -C "$RUNNER_TEMP/bashunit-source" rev-parse HEAD)" = "$BASHUNIT_COMMIT"
+          (cd "$RUNNER_TEMP/bashunit-source" && ./build.sh "$RUNNER_TEMP/bin")
           printf '%s  %s\n' "$BASHUNIT_SHA256" "$RUNNER_TEMP/bin/bashunit" | shasum -a 256 -c -
           chmod 0755 "$RUNNER_TEMP/bin/bashunit"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"

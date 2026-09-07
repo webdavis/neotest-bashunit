@@ -3,23 +3,13 @@
 -- init.lua owns those, so every rule below is testable by `tests/run.lua` under
 -- a bare `nvim --headless --clean -l`, with no plugin installed.
 --
--- Every rule and fixture here was measured against ONE bashunit release, named
--- by `M.verified_version` below and checked by this project's own gate. See
--- that field for why the check exists rather than a version pin.
+-- Output fixtures were measured on the beta build identified by artifact.lua.
+-- It still reports 0.50.1, so the fixture gate and health check verify both
+-- this version and the executable digest.
 
 local M = {}
 
 M.suffix = ".test.sh"
-
----The bashunit release every rule in this file was measured against.
----
----The suite in tests/parse_spec.lua runs `bashunit --version` and fails when
----the installed release differs from this field. Frozen fixtures alone cannot
----detect a change in bashunit's output. `:checkhealth neotest-bashunit` also
----warns about a version mismatch; it does not prevent the adapter from running.
----
----Moving this means re-measuring, not just editing: every fixture in
----tests/parse_spec.lua is transcribed from a run of this exact version.
 M.verified_version = "0.50.1"
 
 ---The release number out of `bashunit --version`, which prints it wrapped in

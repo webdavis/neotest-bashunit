@@ -55,10 +55,47 @@ local function one_test(tree, title, args)
   assert(results[tree:data().id].status == "passed", vim.inspect(results))
 end
 
+local function unverified_build(tree)
+  local original = vim.env.PATH
+  local root = vim.fn.tempname()
+  vim.fn.mkdir(root, "p")
+  vim.fn.writefile({ "#!/bin/sh", "printf 'bashunit - 0.50.1\\n'" }, root .. "/bashunit")
+  vim.fn.setfperm(root .. "/bashunit", "rwx------")
+  vim.env.PATH = root .. ":" .. original
+  local ok, result = pcall(adapter.build_spec, { tree = tree })
+  vim.env.PATH = original
+  return ok, result
+end
+
 return {
+  ["verified beta exclusions preserve brackets stars and question marks literally"] = function()
+    local _, nodes = fixture({ "test_a", "test_a,[bc]", "test_a,*", "test_a,?" })
+    one_test(nodes.test_a, "A")
+  end,
+
+  ["generated beta exclusions escape a backslash without changing the selected filter"] = function()
+    -- A synthetic tree exercises the argument boundary. Bash refuses literal
+    -- backslashes in function definitions, so this is not a discovery claim.
+    local _, nodes = fixture({ "test_a", "test_a,\\b" })
+    local spec = adapter.build_spec({ tree = nodes.test_a })
+    assert(spec.command[1] == vim.fn.exepath("bashunit"), "run the executable whose bytes were verified")
+    assert(spec.command[6] == "test_a", vim.inspect(spec.command))
+    assert(spec.command[8] == "test_a,\\\\b", vim.inspect(spec.command))
+  end,
+
+  ["an unreadable build cannot enable the beta exception"] = function()
+    local artifact = require("neotest-bashunit.artifact")
+    assert(not artifact.verified(vim.fn.tempname()), "missing bytes must not certify an executable")
+  end,
+
+  ["the verified beta isolates a test beside a comma-containing sibling"] = function()
+    local _, nodes = fixture({ "test_a", "test_a,{b}" })
+    one_test(nodes.test_a, "A")
+  end,
+
   ["an exclusion that splits onto the selected name refuses the run with file guidance"] = function()
     local _, nodes = fixture({ "test_a", "test_a,{b}" })
-    local ok, message = pcall(adapter.build_spec, { tree = nodes.test_a })
+    local ok, message = unverified_build(nodes.test_a)
     assert(not ok, "the unsafe individual run must be refused before returning a command")
     assert(message:find("test_a", 1, true) and message:find("test_a,{b}", 1, true), message)
     assert(message:find("whole file", 1, true), message)
@@ -66,14 +103,14 @@ return {
 
   ["a later comma fragment that matches the selection also refuses the run"] = function()
     local _, nodes = fixture({ "test_a", "test_b,a" })
-    local ok, message = pcall(adapter.build_spec, { tree = nodes.test_a })
+    local ok, message = unverified_build(nodes.test_a)
     assert(not ok, "the later exclusion fragment must not erase the selected test")
     assert(message:find("whole file", 1, true), message)
   end,
 
   ["a comma fragment pattern that matches the selection refuses the run"] = function()
     local _, nodes = fixture({ "test_ab", "test_abz,[ab]" })
-    local ok, message = pcall(adapter.build_spec, { tree = nodes.test_ab })
+    local ok, message = unverified_build(nodes.test_ab)
     assert(not ok, "the comma fragment pattern must not erase the selected test")
     assert(message:find("whole file", 1, true), message)
   end,
@@ -84,7 +121,7 @@ return {
     vim.system = function()
       error("exclusion probe unavailable")
     end
-    local ok, message = pcall(adapter.build_spec, { tree = nodes.test_foo })
+    local ok, message = unverified_build(nodes.test_foo)
     vim.system = system
     assert(not ok, "an unchecked exclusion must not be launched")
     assert(message:find("whole file", 1, true), message)
@@ -108,7 +145,7 @@ return {
         end,
       }
     end
-    local ok, message = pcall(adapter.build_spec, { tree = nodes.test_foo })
+    local ok, message = unverified_build(nodes.test_foo)
     vim.system = system
     assert(not ok, "an incomplete exclusion check must not allow a launch")
     assert(message:find("whole file", 1, true), message)
