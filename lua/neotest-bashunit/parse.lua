@@ -13,17 +13,10 @@ M.suffix = ".test.sh"
 
 ---The bashunit release every rule in this file was measured against.
 ---
----A release that changes an output shape would leave this adapter's frozen
----fixtures green while it silently misreported real runs, so the gate refuses
----to certify fixtures captured from a different release and names both
----versions. CI downloads this exact release asset and checks it against a
----pinned sha256, because a runner's cached Homebrew index poured 0.43.0 into a
----job measured on this version; that version, that checksum and this field
----must all move together by hand. The Homebrew declarations (Brewfile.dev, the
----machine package set) stay unpinned, since Homebrew has no declarative
----version pin, so on a local machine this gate is the only pin there is. That
----is the same trade the repository takes on stylua and for the same reason: a
----visible failure on an untouched file beats a silent behavior change.
+---The suite in tests/parse_spec.lua runs `bashunit --version` and fails when
+---the installed release differs from this field. Frozen fixtures alone cannot
+---detect a change in bashunit's output. `:checkhealth neotest-bashunit` also
+---warns about a version mismatch; it does not prevent the adapter from running.
 ---
 ---Moving this means re-measuring, not just editing: every fixture in
 ---tests/parse_spec.lua is transcribed from a run of this exact version.

@@ -1,11 +1,9 @@
--- neotest-bashunit: a neotest adapter for bashunit test files, the
--- `<name>.test.sh` shape this repository's bash corpus is migrating to.
+-- neotest-bashunit: a neotest adapter for `<name>.test.sh` files.
 --
--- Written rather than adopted because one unit-testing framework must never
--- call another, and because the three things wanted out of a bash adapter are
--- exactly the three a generic shell runner cannot give: output for ONE test,
--- a jump to the line that actually failed, and running a single test instead of
--- its whole file.
+-- A failing test gets an output buffer holding its report message.
+-- Passing tests retain the run's output because bashunit gives them no message.
+-- A single-test run excludes siblings that bashunit's substring filter would
+-- otherwise include.
 --
 -- Every rule about bashunit's shapes lives in `parse.lua` as a pure function,
 -- verified by `tests/` under a bare headless Neovim. This file is the part that
@@ -154,8 +152,7 @@ local function read_file(path)
   return table.concat(vim.fn.readfile(path, "b"), "\n")
 end
 
----A file holding just this test's own output, which is what makes neotest's
----output window show one test rather than the whole run.
+---A file holding one failing test's report message.
 ---@param message string
 ---@return string
 local function write_output(message)

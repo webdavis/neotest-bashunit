@@ -109,12 +109,14 @@ the adapter's fixtures were measured against.
 
 ## Tests
 
-The tests are pure functions over strings and tables. They run under a bare headless Neovim with
-nothing else installed:
+Run the suite under a bare headless Neovim, with no plugins installed:
 
 ```sh
 nvim --headless --clean -l tests/run.lua
 ```
+
+The suite requires bashunit on `PATH` and fails if its version differs from `M.verified_version`.
+Re-measure the fixtures before changing that version.
 
 Pass a spec name to narrow the run, for example `nvim --headless --clean -l tests/run.lua
 root_spec`.

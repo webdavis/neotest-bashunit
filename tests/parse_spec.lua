@@ -61,16 +61,12 @@ end
 
 return {
   ["the installed bashunit is the release these fixtures were captured from"] = function()
-    -- Homebrew cannot pin declaratively, so this gate is the pin: a bashunit
-    -- release that changes an output shape must fail here rather than leave the
-    -- frozen fixtures below green while real runs are misreported.
+    -- Require the release that produced these fixtures. Frozen output alone
+    -- cannot detect a change in the installed bashunit's behavior.
     -- pcall: vim.fn.system throws on a missing executable rather than setting
     -- shell_error, and the raw E475 does not say where bashunit comes from.
     local ran, output = pcall(vim.fn.system, { "bashunit", "--version" })
-    assert(
-      ran and vim.v.shell_error == 0,
-      "bashunit did not run; it is declared in Brewfile.dev, the CI toolchain step and the machine package set"
-    )
+    assert(ran and vim.v.shell_error == 0, "bashunit did not run; install bashunit and ensure it is on PATH")
     local installed = parse.version_of(output)
     assert(
       installed == parse.verified_version,
