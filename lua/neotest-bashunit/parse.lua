@@ -110,8 +110,16 @@ function M.test_functions(lines)
   for number, line in ipairs(lines) do
     local name, tail = line:match(WITH_KEYWORD)
     if name then
+      -- Bash removes backslash-newline before it splits shell words.
+      local next_line = number + 1
+      while tail:sub(-1) == "\\" and lines[next_line] do
+        tail = tail:sub(1, -2) .. lines[next_line]
+        next_line = next_line + 1
+      end
       tail = tail:gsub("^%s*%(%s*%)", "", 1)
-      local first = tail:match("^%s*(%S+)")
+      -- Operators end a word without whitespace. Keep a leading operator
+      -- as a token too, so an invalid redirect is not an absent body.
+      local first = tail:match("^%s*([^%s;&|()<>]+)") or tail:match("^%s*(%S)")
       -- The body may start on another line, after a comment, or with a
       -- subshell/arithmetic expression. A simple command is not a body.
       if first and not COMPOUND_START[first] and not first:match("^[#(]") then

@@ -182,6 +182,31 @@ return {
     assert(vim.deep_equal(found, { { name = "test_kwbrace{", line = 1 } }), vim.inspect(found))
   end,
 
+  ["test_functions ends the body token at an adjacent redirect"] = function()
+    local found = parse.test_functions({ "function test_redir() {>/dev/null assert_same 1 1; }" })
+    assert(vim.deep_equal(found, { { name = "test_redir", line = 1 } }), vim.inspect(found))
+  end,
+
+  ["test_functions ends a compound keyword at an adjacent parenthesis"] = function()
+    local found = parse.test_functions({ "function test_if() if(true); then assert_same 1 1; fi" })
+    assert(vim.deep_equal(found, { { name = "test_if", line = 1 } }), vim.inspect(found))
+  end,
+
+  ["test_functions joins a continued body without moving its definition line"] = function()
+    local found = parse.test_functions({ "function test_multiline() \\", "{ assert_same 1 1; }" })
+    assert(vim.deep_equal(found, { { name = "test_multiline", line = 1 } }), vim.inspect(found))
+  end,
+
+  ["test_functions still refuses a simple command after a continuation"] = function()
+    local found = parse.test_functions({ "function test_invalid() \\", ":" })
+    assert(#found == 0, vim.inspect(found))
+  end,
+
+  ["test_functions refuses a redirect instead of a compound body"] = function()
+    local found = parse.test_functions({ "function test_invalid() >/dev/null { :; }" })
+    assert(#found == 0, vim.inspect(found))
+  end,
+
   ["test_functions refuses the shapes bash will not parse"] = function()
     -- A bare name still requires parentheses. With the keyword, a brace can
     -- belong to the name, but `:` cannot begin the required compound body.
