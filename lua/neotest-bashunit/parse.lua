@@ -93,13 +93,21 @@ end
 --   function test_x ( ) { ... } and may be surrounded by whitespace
 --   test_x() { ... }            without the keyword they are REQUIRED
 --
--- `function test_x{` and a bare `test_x {` are both syntax errors, so `{` is
--- not a name character and a parenthesis-free definition needs the keyword.
--- That is why the keyword form ends at a word boundary rather than simply
--- dropping the parentheses: without it, the brace would be read as part of the
--- name and offer a position bashunit can never run.
-local WITH_KEYWORD = "^%s*function%s+(test_[^%s(){]+)[%s(]"
-local BARE = "^%s*(test_[^%s(){]+)%s*%(%s*%)"
+-- `{` can belong to the function name. The brace opening a compound body
+-- is a separate shell word, so `function test_x{ { ...; }` names `test_x{`.
+-- Check the token after the name instead of banning braces from the name.
+local WITH_KEYWORD = "^%s*function%s+(test_[^%s()]+)(.*)$"
+local BARE = "^%s*(test_[^%s()]+)%s*%(%s*%)"
+local COMPOUND_START = {
+  ["{"] = true,
+  ["[["] = true,
+  ["if"] = true,
+  ["while"] = true,
+  ["until"] = true,
+  ["for"] = true,
+  ["select"] = true,
+  ["case"] = true,
+}
 
 ---Every test function in a file, in definition order, with its 1-based line.
 ---@param lines string[]
@@ -107,9 +115,17 @@ local BARE = "^%s*(test_[^%s(){]+)%s*%(%s*%)"
 function M.test_functions(lines)
   local found = {}
   for number, line in ipairs(lines) do
-    -- One trailing space, so a definition that ends with the line meets the
-    -- same word boundary as one followed by whitespace or a parenthesis.
-    local name = (line .. " "):match(WITH_KEYWORD) or line:match(BARE)
+    local name, tail = line:match(WITH_KEYWORD)
+    if name then
+      tail = tail:gsub("^%s*%(%s*%)", "", 1)
+      local first = tail:match("^%s*(%S+)")
+      -- The body may start on another line, after a comment, or with a
+      -- subshell/arithmetic expression. A simple command is not a body.
+      if first and not COMPOUND_START[first] and not first:match("^[#(]") then
+        name = nil
+      end
+    end
+    name = name or line:match(BARE)
     if name then
       found[#found + 1] = { name = name, line = number }
     end

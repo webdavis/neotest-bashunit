@@ -156,10 +156,39 @@ return {
     assert(found[1].name == "test_no_parens", "got " .. tostring(found[1] and found[1].name))
   end,
 
+  ["test_functions preserves braces in a parenthesized keyword name"] = function()
+    local found = parse.test_functions({ "function test_kwbrace{() { assert_same 1 1; }" })
+    assert(vim.deep_equal(found, { { name = "test_kwbrace{", line = 1 } }), vim.inspect(found))
+  end,
+
+  ["test_functions preserves braces in a bare function name"] = function()
+    local found = parse.test_functions({ "test_barebrace{() { assert_same 1 1; }" })
+    assert(vim.deep_equal(found, { { name = "test_barebrace{", line = 1 } }), vim.inspect(found))
+  end,
+
+  ["test_functions separates a brace in the name from a parenthesis free body"] = function()
+    local found = parse.test_functions({ "function test_kwbrace{ { assert_same 1 1; }" })
+    assert(vim.deep_equal(found, { { name = "test_kwbrace{", line = 1 } }), vim.inspect(found))
+  end,
+
+  ["test_functions preserves a brace name when the body starts on the next line"] = function()
+    local found = parse.test_functions({ "function test_kwbrace{", "{", "  assert_same 1 1", "}" })
+    assert(vim.deep_equal(found, { { name = "test_kwbrace{", line = 1 } }), vim.inspect(found))
+  end,
+
+  ["test_functions accepts a brace name followed by another compound body"] = function()
+    local found = parse.test_functions({ "function test_kwbrace{ if true; then assert_same 1 1; fi" })
+    assert(vim.deep_equal(found, { { name = "test_kwbrace{", line = 1 } }), vim.inspect(found))
+  end,
+
+  ["test_functions keeps the name before a comment on a multiline declaration"] = function()
+    local found = parse.test_functions({ "function test_kwbrace{ # a brace is part of this name", "{", "  :", "}" })
+    assert(vim.deep_equal(found, { { name = "test_kwbrace{", line = 1 } }), vim.inspect(found))
+  end,
+
   ["test_functions refuses the shapes bash will not parse"] = function()
-    -- The other side of that rule. `function name{` and a bare `name {` are
-    -- both syntax errors, so a name carrying a brace, and a parenthesis-free
-    -- definition without the keyword, are positions bashunit can never run.
+    -- A bare name still requires parentheses. With the keyword, a brace can
+    -- belong to the name, but `:` cannot begin the required compound body.
     local found = parse.test_functions({
       "test_bare_no_parens {",
       "function test_brace{ :; }",
