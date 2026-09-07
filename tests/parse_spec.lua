@@ -1,18 +1,17 @@
--- Every rule neotest-bashunit holds about bashunit 0.50.1's shapes. The
--- fixtures below are transcribed from real runs of that version, not written to
--- match the code: a bashunit release that changes any of them should turn these
--- red rather than change the adapter's behavior quietly.
+-- Output fixtures captured from the 0.50.1 beta identified by artifact.lua.
+-- Paths are normalized to /w; CRLF is added to the console fixture to cover
+-- terminal output. Test statuses, messages, source lines and timings are retained.
 
 local parse = require("neotest-bashunit.parse")
+local artifact = require("neotest-bashunit.artifact")
 
 -- One passing and one failing test, as bashunit's --report-json writes them.
 local REPORT = [[
 {
-  "summary": { "total": 2, "passed": 1, "failed": 1, "skipped": 0, "incomplete": 0, "flaky": 0, "duration_ms": 10 },
+  "summary": { "total": 2, "passed": 1, "failed": 1, "skipped": 0, "incomplete": 0, "flaky": 0, "duration_ms": 12 },
   "tests": [
     { "file": "/w/lines.test.sh", "name": "First", "status": "passed", "duration_ms": 2, "retries": 0, "message": "" },
-    { "file": "/w/lines.test.sh", "name": "Second fails here", "status": "failed", "duration_ms": 8, "retries": 0,
-      "message": "✗ Failed: Second fails here\n    Expected '9'\n    but got  '2'\n    at /w/lines.test.sh:11" }
+    { "file": "/w/lines.test.sh", "name": "Second fails here", "status": "failed", "duration_ms": 10, "retries": 0, "message": "✗ Failed: Second fails here\n    Expected '9'\n    but got  '2'\n    at /w/lines.test.sh:11" }
   ]
 }
 ]]
@@ -21,34 +20,36 @@ local REPORT = [[
 -- assertion's own line appears. \r is what a pty leaves behind, and neotest
 -- runs its command under one.
 --
--- Three failures on purpose. The first carries ONE Source candidate, which is
--- the only shape that identifies an assertion. The second is the same title in
--- a DIFFERENT file, failing on a different line. The third carries TWO
--- candidates, because bashunit lists every textual assertion in the function
--- rather than the one that failed.
+-- Three failures: one Source candidate, two candidates in the next test,
+-- then the first title repeated in another file. Multiple candidates do not
+-- identify which assertion failed.
 local OUTPUT = table.concat({
   "There were 3 failures:\r",
   "\r",
   "|1) /w/lines.test.sh:11\r",
-  "|\226\156\151 Failed: Second fails here\r",
+  "|✗ Failed: Second fails here\r",
   "|    Expected '9'\r",
   "|    but got  '2'\r",
   "|    at /w/lines.test.sh:11\r",
   "|    Source:\r",
   '|    13: assert_same 9 "$x"\r',
-  "|2) /w/other.test.sh:98\r",
-  "|\226\156\151 Failed: Second fails here\r",
-  "|    at /w/other.test.sh:98\r",
-  "|    Source:\r",
-  "|    100: assert_same 1 2\r",
-  "|3) /w/lines.test.sh:15\r",
-  "|\226\156\151 Failed: Two assertions\r",
+  "|2) /w/lines.test.sh:15\r",
+  "|✗ Failed: Two assertions\r",
+  "|    Expected '2'\r",
+  "|    but got  '3'\r",
   "|    at /w/lines.test.sh:15\r",
   "|    Source:\r",
   "|    16: assert_same 1 1\r",
   "|    17: assert_same 2 3\r",
+  "|3) /w/other.test.sh:98\r",
+  "|✗ Failed: Second fails here\r",
+  "|    Expected '9'\r",
+  "|    but got  '2'\r",
+  "|    at /w/other.test.sh:98\r",
+  "|    Source:\r",
+  '|    100: assert_same 9 "$x"\r',
   "\r",
-  "Tests:      2 passed, 3 failed, 5 total\r",
+  "Tests:      1 passed, 3 failed, 4 total\r",
 }, "\n")
 
 local function lines_of(text)
@@ -60,7 +61,7 @@ local function lines_of(text)
 end
 
 return {
-  ["the installed bashunit is the release these fixtures were captured from"] = function()
+  ["the installed bashunit is the build these fixtures were captured from"] = function()
     -- Require the release that produced these fixtures. Frozen output alone
     -- cannot detect a change in the installed bashunit's behavior.
     -- pcall: vim.fn.system throws on a missing executable rather than setting
@@ -69,12 +70,12 @@ return {
     assert(ran and vim.v.shell_error == 0, "bashunit did not run; install bashunit and ensure it is on PATH")
     local installed = parse.version_of(output)
     assert(
-      installed == parse.verified_version,
-      ("bashunit %s is installed, but every rule and fixture in this project was measured against %s. Re-measure them against %s and move parse.verified_version, or install %s."):format(
+      installed == parse.verified_version and artifact.verified(vim.fn.exepath("bashunit")),
+      ("bashunit %s is installed; these fixtures require %s beta %s, SHA-256 %s. Re-measure before changing the version or artifact identity."):format(
         tostring(installed),
         parse.verified_version,
-        tostring(installed),
-        parse.verified_version
+        artifact.verified_revision,
+        artifact.verified_sha256
       )
     )
   end,

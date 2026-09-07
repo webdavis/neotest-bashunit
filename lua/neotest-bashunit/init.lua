@@ -10,6 +10,7 @@
 -- the file system, commands and Bash's exclusion-pattern check.
 
 local parse = require("neotest-bashunit.parse")
+local artifact = require("neotest-bashunit.artifact")
 
 ---@type neotest.Adapter
 local adapter = { name = "neotest-bashunit" }
@@ -132,6 +133,10 @@ local function check_exclusions(selected, excludes, cwd)
   if not has_comma then
     return
   end
+  local executable = vim.fn.exepath("bashunit")
+  if artifact.verified(executable) then
+    return executable
+  end
   local command = { "bash", "--noprofile", "--norc", "-c", EXCLUSION_CHECK, "bash", selected }
   vim.list_extend(command, excludes)
   local ok, result = pcall(function()
@@ -174,9 +179,18 @@ function adapter.build_spec(args)
     -- repeatable and reduces the run to the one test (measured).
     local selected = position.id:match("::(.*)$")
     local excludes = parse.exclude_filters(selected, sibling_function_names(args.tree))
-    check_exclusions(selected, excludes, args.cwd or cwd)
+    local verified = check_exclusions(selected, excludes, args.cwd or cwd)
+    if verified then
+      command[1] = verified
+    end
     vim.list_extend(command, { "--filter", selected })
     for _, sibling in ipairs(excludes) do
+      -- The beta keeps each comma-containing argument whole, but still uses
+      -- shell patterns. Escape generated names so brackets and backslashes
+      -- exclude that sibling literally. The selected filter is unchanged.
+      if verified then
+        sibling = sibling:gsub("([\\*?%[%]])", "\\%1")
+      end
       vim.list_extend(command, { "--exclude-filter", sibling })
     end
   end

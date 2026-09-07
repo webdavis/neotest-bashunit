@@ -19,11 +19,11 @@ whole file.
 - [neotest](https://github.com/nvim-neotest/neotest).
 - `bashunit` on your `PATH`.
 
-The adapter was measured against bashunit 0.50.1. Every rule about bashunit's output shapes is
-recorded in `lua/neotest-bashunit/parse.lua` and pinned by frozen fixtures under `tests/`, with the
-release named in `M.verified_version`. A bashunit that changed an output shape would leave those fixtures
-green while the adapter misreported real runs, so `:checkhealth neotest-bashunit` warns when the
-installed release is not the one the fixtures came from.
+The fixtures were measured against the bashunit 0.50.1 beta built from upstream commit
+[`683ba16f54fee391dc30bea0a5e6201aeef72c19`](https://github.com/TypedDevs/bashunit/commit/683ba16f54fee391dc30bea0a5e6201aeef72c19).
+Its banner still says `0.50.1`, so the version alone cannot distinguish it from the release.
+`parse.verified_version` and the SHA-256 in `lua/neotest-bashunit/artifact.lua` identify the measured
+build. Health checks warn when either differs; the fixture suite fails.
 
 ## Install
 
@@ -89,11 +89,13 @@ then names every sibling the filter would also drag in as an `--exclude-filter`,
 is a substring match rather than a regular expression: `--filter test_alpha` on its own also runs
 `test_alpha_extended` and `test_beta_alpha`.
 
-bashunit [splits exclusions at commas](https://github.com/TypedDevs/bashunit/issues/1340). Selecting
-`test_a` beside `test_a,{b}` would exclude both,
-so the adapter refuses that individual run and asks you to run the whole file. Comma and colon names
-remain selectable when their filters isolate the test. To run the current file, use
-`require("neotest").run.run(vim.fn.expand("%:p"))`; file and directory runs need no exclusions.
+The verified beta fixes [comma splitting in command-line exclusions](https://github.com/TypedDevs/bashunit/pull/1343),
+so selecting `test_a` beside `test_a,{b}` runs just `test_a`. The adapter verifies the executable's
+bytes before using that behavior and escapes shell-pattern characters in its generated exclusions.
+Older or unverified builds retain the safety check: an exclusion that would erase the selection is
+refused with whole-file guidance. Comma and colon names remain selectable when their filters isolate
+the test. To run the current file, use `require("neotest").run.run(vim.fn.expand("%:p"))`;
+file and directory runs need no exclusions.
 
 Color is disabled with `NO_COLOR`, not `--no-color`, which is ignored in either position on 0.50.1.
 
@@ -110,8 +112,8 @@ other's verdict.
 :checkhealth neotest-bashunit
 ```
 
-Reports whether bashunit is on `PATH`, which release it is, and whether that matches the release
-the adapter's fixtures were measured against.
+Reports the executable path, version and verified beta identity. A matching `0.50.1` banner
+without the measured SHA-256 produces a warning.
 
 ## Tests
 
@@ -121,8 +123,9 @@ Run the suite under a bare headless Neovim, with no plugins installed:
 nvim --headless --clean -l tests/run.lua
 ```
 
-The suite requires bashunit on `PATH` and fails if its version differs from `M.verified_version`.
-Re-measure the fixtures before changing that version.
+The suite requires the verified beta on `PATH` and checks its version and SHA-256. Re-measure
+the fixtures before changing either pin. Selection tests also cover refusal on an isolated
+unverified executable with the same version banner.
 
 Pass a spec name to narrow the run, for example `nvim --headless --clean -l tests/run.lua
 root_spec`.
