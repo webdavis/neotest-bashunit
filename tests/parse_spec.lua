@@ -61,16 +61,12 @@ end
 
 return {
   ["the installed bashunit is the release these fixtures were captured from"] = function()
-    -- Homebrew cannot pin declaratively, so this gate is the pin: a bashunit
-    -- release that changes an output shape must fail here rather than leave the
-    -- frozen fixtures below green while real runs are misreported.
+    -- Require the release that produced these fixtures. Frozen output alone
+    -- cannot detect a change in the installed bashunit's behavior.
     -- pcall: vim.fn.system throws on a missing executable rather than setting
     -- shell_error, and the raw E475 does not say where bashunit comes from.
     local ran, output = pcall(vim.fn.system, { "bashunit", "--version" })
-    assert(
-      ran and vim.v.shell_error == 0,
-      "bashunit did not run; it is declared in Brewfile.dev, the CI toolchain step and the machine package set"
-    )
+    assert(ran and vim.v.shell_error == 0, "bashunit did not run; install bashunit and ensure it is on PATH")
     local installed = parse.version_of(output)
     assert(
       installed == parse.verified_version,
@@ -156,10 +152,64 @@ return {
     assert(found[1].name == "test_no_parens", "got " .. tostring(found[1] and found[1].name))
   end,
 
+  ["test_functions preserves braces in a parenthesized keyword name"] = function()
+    local found = parse.test_functions({ "function test_kwbrace{() { assert_same 1 1; }" })
+    assert(vim.deep_equal(found, { { name = "test_kwbrace{", line = 1 } }), vim.inspect(found))
+  end,
+
+  ["test_functions preserves braces in a bare function name"] = function()
+    local found = parse.test_functions({ "test_barebrace{() { assert_same 1 1; }" })
+    assert(vim.deep_equal(found, { { name = "test_barebrace{", line = 1 } }), vim.inspect(found))
+  end,
+
+  ["test_functions separates a brace in the name from a parenthesis free body"] = function()
+    local found = parse.test_functions({ "function test_kwbrace{ { assert_same 1 1; }" })
+    assert(vim.deep_equal(found, { { name = "test_kwbrace{", line = 1 } }), vim.inspect(found))
+  end,
+
+  ["test_functions preserves a brace name when the body starts on the next line"] = function()
+    local found = parse.test_functions({ "function test_kwbrace{", "{", "  assert_same 1 1", "}" })
+    assert(vim.deep_equal(found, { { name = "test_kwbrace{", line = 1 } }), vim.inspect(found))
+  end,
+
+  ["test_functions accepts a brace name followed by another compound body"] = function()
+    local found = parse.test_functions({ "function test_kwbrace{ if true; then assert_same 1 1; fi" })
+    assert(vim.deep_equal(found, { { name = "test_kwbrace{", line = 1 } }), vim.inspect(found))
+  end,
+
+  ["test_functions keeps the name before a comment on a multiline declaration"] = function()
+    local found = parse.test_functions({ "function test_kwbrace{ # a brace is part of this name", "{", "  :", "}" })
+    assert(vim.deep_equal(found, { { name = "test_kwbrace{", line = 1 } }), vim.inspect(found))
+  end,
+
+  ["test_functions ends the body token at an adjacent redirect"] = function()
+    local found = parse.test_functions({ "function test_redir() {>/dev/null assert_same 1 1; }" })
+    assert(vim.deep_equal(found, { { name = "test_redir", line = 1 } }), vim.inspect(found))
+  end,
+
+  ["test_functions ends a compound keyword at an adjacent parenthesis"] = function()
+    local found = parse.test_functions({ "function test_if() if(true); then assert_same 1 1; fi" })
+    assert(vim.deep_equal(found, { { name = "test_if", line = 1 } }), vim.inspect(found))
+  end,
+
+  ["test_functions joins a continued body without moving its definition line"] = function()
+    local found = parse.test_functions({ "function test_multiline() \\", "{ assert_same 1 1; }" })
+    assert(vim.deep_equal(found, { { name = "test_multiline", line = 1 } }), vim.inspect(found))
+  end,
+
+  ["test_functions still refuses a simple command after a continuation"] = function()
+    local found = parse.test_functions({ "function test_invalid() \\", ":" })
+    assert(#found == 0, vim.inspect(found))
+  end,
+
+  ["test_functions refuses a redirect instead of a compound body"] = function()
+    local found = parse.test_functions({ "function test_invalid() >/dev/null { :; }" })
+    assert(#found == 0, vim.inspect(found))
+  end,
+
   ["test_functions refuses the shapes bash will not parse"] = function()
-    -- The other side of that rule. `function name{` and a bare `name {` are
-    -- both syntax errors, so a name carrying a brace, and a parenthesis-free
-    -- definition without the keyword, are positions bashunit can never run.
+    -- A bare name still requires parentheses. With the keyword, a brace can
+    -- belong to the name, but `:` cannot begin the required compound body.
     local found = parse.test_functions({
       "test_bare_no_parens {",
       "function test_brace{ :; }",

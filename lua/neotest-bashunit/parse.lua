@@ -13,17 +13,10 @@ M.suffix = ".test.sh"
 
 ---The bashunit release every rule in this file was measured against.
 ---
----A release that changes an output shape would leave this adapter's frozen
----fixtures green while it silently misreported real runs, so the gate refuses
----to certify fixtures captured from a different release and names both
----versions. CI downloads this exact release asset and checks it against a
----pinned sha256, because a runner's cached Homebrew index poured 0.43.0 into a
----job measured on this version; that version, that checksum and this field
----must all move together by hand. The Homebrew declarations (Brewfile.dev, the
----machine package set) stay unpinned, since Homebrew has no declarative
----version pin, so on a local machine this gate is the only pin there is. That
----is the same trade the repository takes on stylua and for the same reason: a
----visible failure on an untouched file beats a silent behavior change.
+---The suite in tests/parse_spec.lua runs `bashunit --version` and fails when
+---the installed release differs from this field. Frozen fixtures alone cannot
+---detect a change in bashunit's output. `:checkhealth neotest-bashunit` also
+---warns about a version mismatch; it does not prevent the adapter from running.
 ---
 ---Moving this means re-measuring, not just editing: every fixture in
 ---tests/parse_spec.lua is transcribed from a run of this exact version.
@@ -93,13 +86,21 @@ end
 --   function test_x ( ) { ... } and may be surrounded by whitespace
 --   test_x() { ... }            without the keyword they are REQUIRED
 --
--- `function test_x{` and a bare `test_x {` are both syntax errors, so `{` is
--- not a name character and a parenthesis-free definition needs the keyword.
--- That is why the keyword form ends at a word boundary rather than simply
--- dropping the parentheses: without it, the brace would be read as part of the
--- name and offer a position bashunit can never run.
-local WITH_KEYWORD = "^%s*function%s+(test_[^%s(){]+)[%s(]"
-local BARE = "^%s*(test_[^%s(){]+)%s*%(%s*%)"
+-- `{` can belong to the function name. The brace opening a compound body
+-- is a separate shell word, so `function test_x{ { ...; }` names `test_x{`.
+-- Check the token after the name instead of banning braces from the name.
+local WITH_KEYWORD = "^%s*function%s+(test_[^%s()]+)(.*)$"
+local BARE = "^%s*(test_[^%s()]+)%s*%(%s*%)"
+local COMPOUND_START = {
+  ["{"] = true,
+  ["[["] = true,
+  ["if"] = true,
+  ["while"] = true,
+  ["until"] = true,
+  ["for"] = true,
+  ["select"] = true,
+  ["case"] = true,
+}
 
 ---Every test function in a file, in definition order, with its 1-based line.
 ---@param lines string[]
@@ -107,9 +108,25 @@ local BARE = "^%s*(test_[^%s(){]+)%s*%(%s*%)"
 function M.test_functions(lines)
   local found = {}
   for number, line in ipairs(lines) do
-    -- One trailing space, so a definition that ends with the line meets the
-    -- same word boundary as one followed by whitespace or a parenthesis.
-    local name = (line .. " "):match(WITH_KEYWORD) or line:match(BARE)
+    local name, tail = line:match(WITH_KEYWORD)
+    if name then
+      -- Bash removes backslash-newline before it splits shell words.
+      local next_line = number + 1
+      while tail:sub(-1) == "\\" and lines[next_line] do
+        tail = tail:sub(1, -2) .. lines[next_line]
+        next_line = next_line + 1
+      end
+      tail = tail:gsub("^%s*%(%s*%)", "", 1)
+      -- Operators end a word without whitespace. Keep a leading operator
+      -- as a token too, so an invalid redirect is not an absent body.
+      local first = tail:match("^%s*([^%s;&|()<>]+)") or tail:match("^%s*(%S)")
+      -- The body may start on another line, after a comment, or with a
+      -- subshell/arithmetic expression. A simple command is not a body.
+      if first and not COMPOUND_START[first] and not first:match("^[#(]") then
+        name = nil
+      end
+    end
+    name = name or line:match(BARE)
     if name then
       found[#found + 1] = { name = name, line = number }
     end

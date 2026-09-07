@@ -1,0 +1,33 @@
+name: Lint
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  lint:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install lint and test tools
+        env:
+          BASHUNIT_VERSION: "0.50.1"
+          BASHUNIT_SHA256: "18d83d590c5304f1853dd4fe4fec4ec6effbd9fe5a21831fe9f66f70afe17d93"
+        run: |
+          set -euo pipefail
+          brew install bash luacheck neovim stylua
+          mkdir -p "$RUNNER_TEMP/bin"
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/bin/bashunit" "https://github.com/TypedDevs/bashunit/releases/download/${BASHUNIT_VERSION}/bashunit"
+          printf '%s  %s\n' "$BASHUNIT_SHA256" "$RUNNER_TEMP/bin/bashunit" | shasum -a 256 -c -
+          chmod 0755 "$RUNNER_TEMP/bin/bashunit"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - name: Check Lua formatting
+        run: stylua --check lua tests
+      - name: Lint Lua
+        run: luacheck lua tests --globals vim --no-max-line-length
+      - name: Run Lua tests
+        run: nvim --headless --clean -l tests/run.lua

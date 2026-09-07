@@ -25,7 +25,7 @@ neotest-bashunit runs bashunit test files through |neotest|.
 Bash test runners generally give you a whole file or nothing. This adapter
 provides the three things a generic shell runner cannot:
 
-  - output for ONE test, rather than the whole run it belonged to
+  - an output buffer containing one failing test's message
   - a jump to the line that actually failed
   - running a single test instead of its whole file
 
@@ -116,6 +116,16 @@ every sibling the filter would also drag in as an `--exclude-filter`.
 `--filter test_alpha` on its own also runs `test_alpha_extended` and
 `test_beta_alpha`. Anchoring it matches nothing at all.
 
+bashunit splits exclusions at commas. Selecting `test_a` beside `test_a,{b}`
+would exclude both, so the adapter refuses that individual run and asks you
+to run the whole file. Comma and colon names remain selectable when their
+filters isolate the test. Run the current file with: >lua
+
+    require("neotest").run.run(vim.fn.expand("%:p"))
+<
+File and directory runs need no exclusions. The bashunit limitation is tracked
+at https://github.com/TypedDevs/bashunit/issues/1340.
+
 Color is disabled through the `NO_COLOR` environment variable rather than
 `--no-color`, which is ignored in either position on 0.50.1.
 
@@ -131,8 +141,9 @@ it. When it lists several, which does not say which one failed, the jump goes
 to the test function's own line and the message says so, rather than pointing
 confidently at an assertion that passed.
 
-Each failing test also gets an output buffer holding only its own message, so
-the output window shows one test rather than the whole run.
+Each failing test also gets an output buffer holding only its own message.
+Passing tests show the whole run's output because bashunit reports no message
+for them.
 
 ==============================================================================
 8. AMBIGUOUS TITLES                                *neotest-bashunit-ambiguous*
@@ -159,11 +170,13 @@ release matches the one this adapter's fixtures were measured against.
 ==============================================================================
 10. TESTS                                              *neotest-bashunit-tests*
 
-The rules live as pure functions over strings and tables, so they run under a
-bare headless Neovim with nothing installed: >sh
+Run the suite under a bare headless Neovim, with no plugins installed: >sh
 
     nvim --headless --clean -l tests/run.lua
 <
+The suite requires bashunit on $PATH and fails if its version differs from
+`M.verified_version`. Re-measure the fixtures before changing that version.
+
 Pass a spec name to narrow the run: >sh
 
     nvim --headless --clean -l tests/run.lua root_spec

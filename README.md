@@ -89,6 +89,12 @@ then names every sibling the filter would also drag in as an `--exclude-filter`,
 is a substring match rather than a regular expression: `--filter test_alpha` on its own also runs
 `test_alpha_extended` and `test_beta_alpha`.
 
+bashunit [splits exclusions at commas](https://github.com/TypedDevs/bashunit/issues/1340). Selecting
+`test_a` beside `test_a,{b}` would exclude both,
+so the adapter refuses that individual run and asks you to run the whole file. Comma and colon names
+remain selectable when their filters isolate the test. To run the current file, use
+`require("neotest").run.run(vim.fn.expand("%:p"))`; file and directory runs need no exclusions.
+
 Color is disabled with `NO_COLOR`, not `--no-color`, which is ignored in either position on 0.50.1.
 
 ## Two tests with the same title
@@ -109,12 +115,14 @@ the adapter's fixtures were measured against.
 
 ## Tests
 
-The tests are pure functions over strings and tables. They run under a bare headless Neovim with
-nothing else installed:
+Run the suite under a bare headless Neovim, with no plugins installed:
 
 ```sh
 nvim --headless --clean -l tests/run.lua
 ```
+
+The suite requires bashunit on `PATH` and fails if its version differs from `M.verified_version`.
+Re-measure the fixtures before changing that version.
 
 Pass a spec name to narrow the run, for example `nvim --headless --clean -l tests/run.lua
 root_spec`.

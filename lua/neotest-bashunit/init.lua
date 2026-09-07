@@ -1,15 +1,13 @@
--- neotest-bashunit: a neotest adapter for bashunit test files, the
--- `<name>.test.sh` shape this repository's bash corpus is migrating to.
+-- neotest-bashunit: a neotest adapter for `<name>.test.sh` files.
 --
--- Written rather than adopted because one unit-testing framework must never
--- call another, and because the three things wanted out of a bash adapter are
--- exactly the three a generic shell runner cannot give: output for ONE test,
--- a jump to the line that actually failed, and running a single test instead of
--- its whole file.
+-- A failing test gets an output buffer holding its report message.
+-- Passing tests retain the run's output because bashunit gives them no message.
+-- A single-test run excludes siblings that bashunit's substring filter would
+-- otherwise include.
 --
--- Every rule about bashunit's shapes lives in `parse.lua` as a pure function,
--- verified by `tests/` under a bare headless Neovim. This file is the part that
--- cannot be: the neotest interface, the file system and the command.
+-- Discovery and report rules live in `parse.lua` as pure functions, verified
+-- by `tests/` under a bare headless Neovim. This file owns the neotest interface,
+-- the file system, commands and Bash's exclusion-pattern check.
 
 local parse = require("neotest-bashunit.parse")
 
@@ -107,6 +105,53 @@ local function sibling_function_names(test_node)
   return names
 end
 
+local EXCLUSION_CHECK = [=[
+set -euo pipefail
+selected=$1
+shift
+IFS=,
+for exclusion in "$@"; do
+  # bashunit splits on commas and expands pathnames before its case match.
+  # shellcheck disable=SC2086
+  for fragment in $exclusion; do
+    fragment=${fragment/test_/}
+    if [[ -n $fragment ]]; then
+      case "$selected" in
+        test_*${fragment}*) printf '%s' "$exclusion"; exit 1 ;;
+      esac
+    fi
+  done
+done
+]=]
+
+local function check_exclusions(selected, excludes, cwd)
+  local has_comma = false
+  for _, name in ipairs(excludes) do
+    has_comma = has_comma or name:find(",", 1, true) ~= nil
+  end
+  if not has_comma then
+    return
+  end
+  local command = { "bash", "--noprofile", "--norc", "-c", EXCLUSION_CHECK, "bash", selected }
+  vim.list_extend(command, excludes)
+  local ok, result = pcall(function()
+    return vim.system(command, { cwd = cwd, env = { BASH_ENV = "" }, text = true }):wait(1000)
+  end)
+  if ok and result.code == 0 then
+    return
+  end
+  if ok and result.code == 1 then
+    error(
+      ("bashunit cannot run %q alone: the comma-separated exclusion for %q also excludes it. Run the whole file instead."):format(
+        selected,
+        result.stdout
+      ),
+      0
+    )
+  end
+  error(("bashunit could not check exclusions for %q. Run the whole file instead."):format(selected), 0)
+end
+
 ---@param args neotest.RunArgs
 ---@return neotest.RunSpec|nil
 function adapter.build_spec(args)
@@ -115,6 +160,7 @@ function adapter.build_spec(args)
     return nil
   end
 
+  local cwd = adapter.root(position.path) or vim.fs.dirname(position.path)
   local report = vim.fn.tempname() .. ".json"
   local command = { "bashunit", position.path, "--report-json", report }
 
@@ -127,8 +173,10 @@ function adapter.build_spec(args)
     -- needle would drag in is named back as an `--exclude-filter`, which is
     -- repeatable and reduces the run to the one test (measured).
     local selected = position.id:match("::(.*)$")
+    local excludes = parse.exclude_filters(selected, sibling_function_names(args.tree))
+    check_exclusions(selected, excludes, args.cwd or cwd)
     vim.list_extend(command, { "--filter", selected })
-    for _, sibling in ipairs(parse.exclude_filters(selected, sibling_function_names(args.tree))) do
+    for _, sibling in ipairs(excludes) do
       vim.list_extend(command, { "--exclude-filter", sibling })
     end
   end
@@ -136,7 +184,7 @@ function adapter.build_spec(args)
 
   return {
     command = command,
-    cwd = adapter.root(position.path) or vim.fs.dirname(position.path),
+    cwd = cwd,
     context = { report = report },
     -- NO_COLOR, not --no-color: the flag is ignored in either position on
     -- 0.50.1, and neotest runs its command under a pty, so bashunit would
@@ -154,8 +202,7 @@ local function read_file(path)
   return table.concat(vim.fn.readfile(path, "b"), "\n")
 end
 
----A file holding just this test's own output, which is what makes neotest's
----output window show one test rather than the whole run.
+---A file holding one failing test's report message.
 ---@param message string
 ---@return string
 local function write_output(message)

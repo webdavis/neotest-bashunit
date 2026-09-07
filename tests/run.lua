@@ -5,7 +5,8 @@
 --
 -- `--clean` keeps every plugin out, neotest included, which is the point: the
 -- rules under test are the pure ones in `parse.lua`, so they must hold with
--- nothing installed. A spec file returns a table of
+-- no plugins installed. The version check requires bashunit on PATH.
+-- A spec file returns a table of
 -- `["what it does"] = function() ... end` cases and asserts with plain
 -- `assert`. No plenary, no busted.
 
